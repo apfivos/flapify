@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="40" fill="#050608" />
+  <rect x="32" y="48" width="192" height="160" rx="18" fill="#101317" stroke="#252b31" stroke-width="8" />
+  <path d="M48 128h160" stroke="#050608" stroke-width="6" />
+  <text
+    x="128"
+    y="121"
+    text-anchor="middle"
+    font-size="72"
+    font-family="'Space Mono', monospace"
+    font-weight="700"
+    fill="#f6f0e6"
+  >F</text>
+  <text
+    x="128"
+    y="176"
+    text-anchor="middle"
+    font-size="72"
+    font-family="'Space Mono', monospace"
+    font-weight="700"
+    fill="#f6f0e6"
+  >F</text>
+</svg>

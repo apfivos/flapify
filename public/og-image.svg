@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">Flapify social image</title>
+  <desc id="desc">Flapify premium split-flap display placeholder social share image.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a0d11" />
+      <stop offset="100%" stop-color="#050608" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <rect x="76" y="88" width="1048" height="454" rx="24" fill="#10151b" stroke="#242c36" />
+  <g fill="#f2f4f7" font-family="'Space Mono', monospace" font-size="56" font-weight="700" letter-spacing="8">
+    <text x="124" y="212">FLAPIFY</text>
+    <text x="124" y="304">TURN ANY SCREEN</text>
+    <text x="124" y="396">INTO A SPLIT-FLAP</text>
+    <text x="124" y="488">DISPLAY</text>
+  </g>
+</svg>
