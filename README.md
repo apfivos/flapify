@@ -1,5 +1,11 @@
 # Flapify
 
+<p align="center">
+  <video src="https://github.com/user-attachments/assets/f5bc08df-1b50-4f91-9091-87b52b5e8e7f" width="600" autoplay loop muted playsinline>
+    Your browser does not support the video tag.
+  </video>
+</p>
+
 Turn any screen into a premium split-flap display. Free. No hardware needed.
 
 Flapify is a Vite + React + TypeScript web app that recreates the feel of a mechanical airport flapboard on any TV, monitor, tablet, or wall-mounted display. It is designed to work out of the box with zero backend and zero required API keys.
@@ -82,14 +88,14 @@ Works well on:
 
 ```text
 src/
-  app/                App shell
-  audio/              Mechanical audio engine
-  components/         Board, drawer, onboarding, runtime UI
-  data/               Weather and crypto feed adapters
-  hooks/              Runtime hooks such as wake lock and keyboard shortcuts
-  lib/                Board formatting, scenes, browser helpers
-  state/              Local storage persistence
-public/               Manifest and static assets
+  app/          App shell
+  audio/        Mechanical audio engine
+  components/   Board, drawer, onboarding, runtime UI
+  data/         Weather and crypto feed adapters
+  hooks/        Runtime hooks such as wake lock and keyboard shortcuts
+  lib/          Board formatting, scenes, browser helpers
+  state/        Local storage persistence
+public/         Manifest and static assets
 ```
 
 ## Scripts
