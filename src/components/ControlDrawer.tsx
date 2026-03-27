@@ -73,8 +73,16 @@ function sceneTone(sceneId: SceneId, feeds: AppFeeds, settings: PersistedSetting
     return settings.customMessages.length > 0 ? "neutral" : "setup";
   }
 
+  if (sceneId === "countdown") {
+    return settings.countdowns.length > 0 ? "neutral" : "setup";
+  }
+
   if (sceneId === "weather") {
     return feedTone(feeds.weather);
+  }
+
+  if (sceneId === "news") {
+    return feedTone(feeds.news);
   }
 
   return feedTone(feeds.crypto);
@@ -196,14 +204,23 @@ export function ControlDrawer({
                 <span>FLAPIFY</span>
                 <small>{activeSceneId ? SCENE_LABELS[activeSceneId] : "Idle"}</small>
               </div>
-              <button
-                type="button"
-                className="ff-button ff-button--ghost ff-button--icon"
-                aria-label="Open advanced controls"
-                onClick={() => setAdvancedOpen(true)}
-              >
-                ⚙
-              </button>
+              <div className="ff-drawer__header-actions">
+                <button
+                  type="button"
+                  className="ff-button ff-button--ghost"
+                  onClick={() => setHelpOpen(true)}
+                >
+                  Info & Setup
+                </button>
+                <button
+                  type="button"
+                  className="ff-button ff-button--ghost"
+                  aria-label="Open advanced controls"
+                  onClick={() => setAdvancedOpen(true)}
+                >
+                  Advanced
+                </button>
+              </div>
             </div>
 
             <div className="ff-remote-card">

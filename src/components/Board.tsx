@@ -1,5 +1,6 @@
+import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BOARD_COLS, BOARD_ROWS, FLIP_STAGGER_MS } from "../constants";
+import { FLIP_STAGGER_MS } from "../constants";
 import type { BoardGrid } from "../types";
 import { gridToSignature } from "../lib/board";
 import { Flap } from "./Flap";
@@ -18,6 +19,8 @@ interface BoardProps {
 
 export function Board({ grid, onBusyChange }: BoardProps) {
   const signature = useMemo(() => gridToSignature(grid), [grid]);
+  const rowCount = grid.length;
+  const colCount = grid[0]?.length ?? 0;
   const [previousGrid, setPreviousGrid] = useState(grid);
   const [activeFlips, setActiveFlips] = useState<ActiveFlipMap>({});
   const [scheduledFlipCount, setScheduledFlipCount] = useState(0);
@@ -52,8 +55,8 @@ export function Board({ grid, onBusyChange }: BoardProps) {
     const changes: Array<{ row: number; col: number; delay: number; token: number }> = [];
     const pendingChanges: Array<{ row: number; col: number; nextChar: string; token: number }> = [];
 
-    for (let row = 0; row < BOARD_ROWS; row += 1) {
-      for (let col = 0; col < BOARD_COLS; col += 1) {
+    for (let row = 0; row < rowCount; row += 1) {
+      for (let col = 0; col < colCount; col += 1) {
         if (grid[row][col] !== fromGrid[row][col]) {
           pendingChanges.push({
             row,
@@ -104,10 +107,19 @@ export function Board({ grid, onBusyChange }: BoardProps) {
 
     previousGridRef.current = grid;
     previousSignatureRef.current = signature;
-  }, [grid, signature]);
+  }, [colCount, grid, rowCount, signature]);
 
   return (
-    <div className="ff-board">
+    <div
+      className="ff-board"
+      style={
+        {
+          "--ff-board-cols": colCount,
+          "--ff-board-rows": rowCount,
+          "--ff-board-aspect-ratio": `${colCount * 0.72} / ${rowCount}`,
+        } as CSSProperties
+      }
+    >
       {grid.flatMap((row, rowIndex) =>
         row.map((char, colIndex) => (
           <Flap

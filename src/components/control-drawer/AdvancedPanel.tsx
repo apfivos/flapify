@@ -1,5 +1,13 @@
-import { APP_VERSION, SCENE_LABELS, THEME_LABELS } from "../../constants";
-import type { AppFeeds, LocationSelection, PersistedSettings, ThemeId } from "../../types";
+import { useState } from "react";
+import { APP_VERSION, BOARD_SIZE_PRESETS, SCENE_LABELS, THEME_LABELS } from "../../constants";
+import { QUOTE_PACKS } from "../../data/quotePacks";
+import type {
+  AppFeeds,
+  BoardSizeId,
+  LocationSelection,
+  PersistedSettings,
+  ThemeId,
+} from "../../types";
 import { moveScene, replacePlaylistItem } from "./shared";
 
 interface WakeLockStatus {
@@ -25,6 +33,12 @@ interface AdvancedPanelProps {
   onOpenHelp: () => void;
   onClose: () => void;
 }
+
+const BOARD_SIZE_LABELS: Record<BoardSizeId, string> = {
+  standard: "Standard 6 x 22",
+  large: "Large 4 x 16",
+  dense: "Dense 8 x 28",
+};
 
 function wakeLockLabel(wakeLock: WakeLockStatus): string {
   if (!wakeLock.supported) {
@@ -66,6 +80,17 @@ function addTextListItem(values: string[], fallback: string, max: number): strin
   return [...values, fallback].slice(0, max);
 }
 
+function createLocalId(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function mergeQuotes(currentQuotes: string[], nextQuotes: string[], replace: boolean): string[] {
+  const normalizedCurrent = currentQuotes.map((entry) => entry.trim().toUpperCase()).filter(Boolean);
+  const normalizedNext = nextQuotes.map((entry) => entry.trim().toUpperCase()).filter(Boolean);
+  const merged = replace ? normalizedNext : [...normalizedCurrent, ...normalizedNext];
+  return [...new Set(merged)].slice(0, 40);
+}
+
 export function AdvancedPanel({
   settings,
   feeds,
@@ -83,6 +108,45 @@ export function AdvancedPanel({
   onOpenHelp,
   onClose,
 }: AdvancedPanelProps) {
+  const [countdownLabelDraft, setCountdownLabelDraft] = useState("");
+  const [countdownDateDraft, setCountdownDateDraft] = useState("");
+  const [newsFeedDraft, setNewsFeedDraft] = useState("");
+
+  const addCountdown = () => {
+    const label = countdownLabelDraft.trim().toUpperCase();
+    const targetDate = countdownDateDraft.trim();
+    if (!label || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+      return;
+    }
+
+    updateSettings((current) => ({
+      ...current,
+      countdowns: [
+        ...current.countdowns,
+        {
+          id: createLocalId("countdown"),
+          label,
+          targetDate,
+        },
+      ].slice(0, 16),
+    }));
+    setCountdownLabelDraft("");
+    setCountdownDateDraft("");
+  };
+
+  const addNewsFeed = () => {
+    const nextFeed = newsFeedDraft.trim();
+    if (!/^https?:\/\//i.test(nextFeed)) {
+      return;
+    }
+
+    updateSettings((current) => ({
+      ...current,
+      newsFeeds: [...new Set([...current.newsFeeds, nextFeed])].slice(0, 8),
+    }));
+    setNewsFeedDraft("");
+  };
+
   return (
     <section className="ff-advanced" aria-label="Advanced controls">
       <div className="ff-advanced__header">
@@ -258,6 +322,42 @@ export function AdvancedPanel({
             </button>
           </div>
 
+          <div className="ff-pack-grid">
+            {QUOTE_PACKS.map((pack) => (
+              <div key={pack.id} className="ff-pack-card">
+                <strong>{pack.label}</strong>
+                <span>{pack.description}</span>
+                <small>{pack.quotes.length} quotes</small>
+                <div className="ff-card-actions">
+                  <button
+                    type="button"
+                    className="ff-button ff-button--primary"
+                    onClick={() =>
+                      updateSettings((current) => ({
+                        ...current,
+                        quoteRotation: mergeQuotes(current.quoteRotation, pack.quotes, true),
+                      }))
+                    }
+                  >
+                    Load
+                  </button>
+                  <button
+                    type="button"
+                    className="ff-button ff-button--ghost"
+                    onClick={() =>
+                      updateSettings((current) => ({
+                        ...current,
+                        quoteRotation: mergeQuotes(current.quoteRotation, pack.quotes, false),
+                      }))
+                    }
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
           <div className="ff-list">
             {settings.quoteRotation.map((quote, index) => (
               <div key={`${quote}-${index}`} className="ff-list__row">
@@ -319,6 +419,149 @@ export function AdvancedPanel({
         <section className="ff-advanced__section">
           <div className="ff-section-heading">
             <div>
+              <p className="ff-label">News feeds</p>
+              <h4>Add RSS sources for the news scene</h4>
+            </div>
+          </div>
+
+          <div className="ff-inline">
+            <input
+              className="ff-input"
+              value={newsFeedDraft}
+              onChange={(event) => setNewsFeedDraft(event.target.value)}
+              placeholder="https://example.com/feed.xml"
+            />
+            <button type="button" className="ff-button ff-button--primary" onClick={addNewsFeed}>
+              Add feed
+            </button>
+          </div>
+
+          <div className="ff-list">
+            {settings.newsFeeds.map((feed, index) => (
+              <div key={`${feed}-${index}`} className="ff-list__row">
+                <input
+                  className="ff-input"
+                  value={feed}
+                  onChange={(event) =>
+                    updateSettings((current) => ({
+                      ...current,
+                      newsFeeds: current.newsFeeds.map((entry, entryIndex) =>
+                        entryIndex === index ? event.target.value.trim() : entry,
+                      ),
+                    }))
+                  }
+                />
+                <button
+                  type="button"
+                  className="ff-button ff-button--danger"
+                  onClick={() =>
+                    updateSettings((current) => ({
+                      ...current,
+                      newsFeeds: current.newsFeeds.filter((_, entryIndex) => entryIndex !== index),
+                    }))
+                  }
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="ff-advanced__section">
+          <div className="ff-section-heading">
+            <div>
+              <p className="ff-label">Countdowns</p>
+              <h4>Add dates worth seeing every day</h4>
+            </div>
+          </div>
+
+          <div className="ff-two-column">
+            <div>
+              <label className="ff-label">Label</label>
+              <input
+                className="ff-input"
+                value={countdownLabelDraft}
+                onChange={(event) => setCountdownLabelDraft(event.target.value)}
+                placeholder="Vacation"
+              />
+            </div>
+            <div>
+              <label className="ff-label">Target date</label>
+              <input
+                className="ff-input"
+                type="date"
+                value={countdownDateDraft}
+                onChange={(event) => setCountdownDateDraft(event.target.value)}
+              />
+            </div>
+          </div>
+
+          <button type="button" className="ff-button ff-button--primary" onClick={addCountdown}>
+            Add countdown
+          </button>
+
+          <div className="ff-list">
+            {settings.countdowns.length === 0 && (
+              <p className="ff-help">Add launch days, holidays, trips, or anything worth anticipating.</p>
+            )}
+            {settings.countdowns.map((countdown, index) => (
+              <div key={countdown.id} className="ff-list__row">
+                <input
+                  className="ff-input"
+                  value={countdown.label}
+                  onChange={(event) =>
+                    updateSettings((current) => ({
+                      ...current,
+                      countdowns: current.countdowns.map((entry, entryIndex) =>
+                        entryIndex === index
+                          ? {
+                              ...entry,
+                              label: event.target.value.toUpperCase(),
+                            }
+                          : entry,
+                      ),
+                    }))
+                  }
+                />
+                <input
+                  className="ff-input"
+                  type="date"
+                  value={countdown.targetDate}
+                  onChange={(event) =>
+                    updateSettings((current) => ({
+                      ...current,
+                      countdowns: current.countdowns.map((entry, entryIndex) =>
+                        entryIndex === index
+                          ? {
+                              ...entry,
+                              targetDate: event.target.value,
+                            }
+                          : entry,
+                      ),
+                    }))
+                  }
+                />
+                <button
+                  type="button"
+                  className="ff-button ff-button--danger"
+                  onClick={() =>
+                    updateSettings((current) => ({
+                      ...current,
+                      countdowns: current.countdowns.filter((entry) => entry.id !== countdown.id),
+                    }))
+                  }
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="ff-advanced__section">
+          <div className="ff-section-heading">
+            <div>
               <p className="ff-label">Saved messages</p>
               <h4>Keep ready-to-send lines on deck</h4>
             </div>
@@ -373,7 +616,7 @@ export function AdvancedPanel({
           <div className="ff-section-heading">
             <div>
               <p className="ff-label">Look and feel</p>
-              <h4>Theme and dimming settings</h4>
+              <h4>Theme, density, and dimming settings</h4>
             </div>
           </div>
 
@@ -393,6 +636,27 @@ export function AdvancedPanel({
                   }
                 >
                   {THEME_LABELS[themeId]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="ff-label">Board size</label>
+            <div className="ff-chip-list">
+              {(Object.keys(BOARD_SIZE_PRESETS) as BoardSizeId[]).map((boardSize) => (
+                <button
+                  type="button"
+                  key={boardSize}
+                  className={`ff-chip ${settings.boardSize === boardSize ? "is-selected" : ""}`}
+                  onClick={() =>
+                    updateSettings((current) => ({
+                      ...current,
+                      boardSize,
+                    }))
+                  }
+                >
+                  {BOARD_SIZE_LABELS[boardSize]}
                 </button>
               ))}
             </div>
@@ -539,6 +803,10 @@ export function AdvancedPanel({
               <span>Crypto feed</span>
             </div>
             <div className="ff-status-list__item">
+              <span className={`ff-status-dot ff-status-dot--${dotTone(feeds.news.status, feeds.news.stale)}`} />
+              <span>News feed</span>
+            </div>
+            <div className="ff-status-list__item">
               <span
                 className={`ff-status-dot ff-status-dot--${wakeLock.active ? "live" : wakeLock.supported ? "waiting" : "setup"}`}
               />
@@ -562,7 +830,7 @@ export function AdvancedPanel({
               Re-run setup
             </button>
             <button type="button" className="ff-button ff-button--ghost" onClick={onOpenHelp}>
-              How to install
+              Info & Setup
             </button>
           </div>
 

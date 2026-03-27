@@ -22,7 +22,7 @@ const STEPS: Array<{ id: StepId; label: string }> = [
 ];
 
 const DEFAULT_SCENES: SceneId[] = ["quote", "clockDate", "weather"];
-const OPTIONAL_SCENES: SceneId[] = ["marketsDashboard", "custom"];
+const OPTIONAL_SCENES: SceneId[] = ["marketsDashboard", "countdown", "news", "custom"];
 
 function isSceneEnabled(settings: PersistedSettings, sceneId: SceneId): boolean {
   return settings.playlist.find((item) => item.id === sceneId)?.enabled ?? false;

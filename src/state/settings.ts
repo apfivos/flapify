@@ -6,8 +6,10 @@ import {
   SETTINGS_STORAGE_KEY,
 } from "../constants";
 import type {
+  CountdownItem,
   DimmingSettings,
   FeedSnapshot,
+  BoardSizeId,
   PersistedSettings,
   SceneId,
   ScenePlaylistItem,
@@ -31,6 +33,48 @@ function uniqueStrings(values: unknown, max = 20): string[] {
   return [...new Set(values.map((value) => `${value}`.trim()).filter(Boolean))]
     .slice(0, max)
     .map((value) => value.toLowerCase() === value ? value : value.toUpperCase());
+}
+
+function uniqueRawStrings(values: unknown, max = 20): string[] {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+  return [...new Set(values.map((value) => `${value}`.trim()).filter(Boolean))].slice(0, max);
+}
+
+function normalizeBoardSize(value: unknown): BoardSizeId {
+  return value === "large" || value === "dense" || value === "standard"
+    ? value
+    : DEFAULT_SETTINGS.boardSize;
+}
+
+function normalizeCountdowns(value: unknown): CountdownItem[] {
+  if (!Array.isArray(value)) {
+    return DEFAULT_SETTINGS.countdowns;
+  }
+
+  const seen = new Set<string>();
+  return value
+    .filter((entry): entry is CountdownItem & { label: string; targetDate: string } => (
+      isObject(entry)
+      && typeof entry.id === "string"
+      && typeof entry.label === "string"
+      && typeof entry.targetDate === "string"
+    ))
+    .map((entry) => ({
+      id: entry.id,
+      label: entry.label.trim().toUpperCase(),
+      targetDate: entry.targetDate.trim(),
+    }))
+    .filter((entry) => {
+      if (!entry.label || !/^\d{4}-\d{2}-\d{2}$/.test(entry.targetDate) || seen.has(entry.id)) {
+        return false;
+      }
+      seen.add(entry.id);
+      return true;
+    })
+    .slice(0, 16);
 }
 
 function normalizePlaylist(value: unknown): ScenePlaylistItem[] {
@@ -117,6 +161,12 @@ function normalizeSettings(value: unknown): PersistedSettings {
         ? uniqueStrings(value.quoteRotation, 40).map((entry) => entry.toUpperCase())
         : DEFAULT_SETTINGS.quoteRotation,
     cryptoWatchlist: uniqueStrings(value.cryptoWatchlist, 10).map((entry) => entry.toLowerCase()),
+    countdowns: normalizeCountdowns(value.countdowns),
+    newsFeeds:
+      Array.isArray(value.newsFeeds)
+        ? uniqueRawStrings(value.newsFeeds, 8).filter((entry) => /^https?:\/\//i.test(entry))
+        : DEFAULT_SETTINGS.newsFeeds,
+    boardSize: normalizeBoardSize(value.boardSize),
     kioskMode: Boolean(value.kioskMode),
     restoreLastState:
       typeof value.restoreLastState === "boolean"

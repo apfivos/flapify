@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { coinGeckoAdapter } from "./providers/coinGecko";
 import { openMeteoAdapter } from "./providers/openMeteo";
+import { rssFeedAdapter } from "./providers/rssFeed";
 import { loadFeedCache, saveFeedCache } from "../state/settings";
 import type { AppFeeds, FeedAdapter, FeedSnapshot, PersistedSettings } from "../types";
 
@@ -183,17 +184,19 @@ export function useFeeds(settings: PersistedSettings): {
   const [refreshNonce, setRefreshNonce] = useState(0);
   const weather = useFeedSnapshot(openMeteoAdapter, settings, refreshNonce);
   const crypto = useFeedSnapshot(coinGeckoAdapter, settings, refreshNonce);
+  const news = useFeedSnapshot(rssFeedAdapter, settings, refreshNonce);
 
   return useMemo(
     () => ({
       feeds: {
         weather,
         crypto,
+        news,
       } satisfies AppFeeds,
       refreshAll: () => {
         setRefreshNonce((value) => value + 1);
       },
     }),
-    [crypto, weather],
+    [crypto, news, weather],
   );
 }

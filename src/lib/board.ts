@@ -1,8 +1,22 @@
-import { BOARD_COLS, BOARD_ROWS, FLAP_CHARSET } from "../constants";
-import type { BoardGrid } from "../types";
+import { BOARD_SIZE_PRESETS, FLAP_CHARSET } from "../constants";
+import type { BoardDimensions, BoardGrid } from "../types";
 
-export function createEmptyGrid(fill = " "): BoardGrid {
-  return Array.from({ length: BOARD_ROWS }, () => Array(BOARD_COLS).fill(fill));
+const DEFAULT_BOARD = BOARD_SIZE_PRESETS.standard;
+
+export function resolveBoardDimensions(board?: BoardDimensions): BoardDimensions {
+  return board ?? DEFAULT_BOARD;
+}
+
+export function createEmptyGrid(board?: BoardDimensions, fill = " "): BoardGrid {
+  const { rows, cols } = resolveBoardDimensions(board);
+  return Array.from({ length: rows }, () => Array(cols).fill(fill));
+}
+
+export function getGridDimensions(grid: BoardGrid): BoardDimensions {
+  return {
+    rows: grid.length,
+    cols: grid[0]?.length ?? 0,
+  };
 }
 
 export function sanitizeChar(char: string): string {
@@ -19,7 +33,8 @@ export function truncateText(value: string, width: number): string {
 }
 
 export function putText(grid: BoardGrid, row: number, col: number, text: string): BoardGrid {
-  if (row < 0 || row >= BOARD_ROWS) {
+  const { rows, cols } = getGridDimensions(grid);
+  if (row < 0 || row >= rows) {
     return grid;
   }
 
@@ -28,7 +43,7 @@ export function putText(grid: BoardGrid, row: number, col: number, text: string)
 
   for (let index = 0; index < normalized.length; index += 1) {
     const targetCol = col + index;
-    if (targetCol < 0 || targetCol >= BOARD_COLS) {
+    if (targetCol < 0 || targetCol >= cols) {
       continue;
     }
     next[row][targetCol] = normalized[index];
@@ -47,7 +62,11 @@ export function padRight(value: string, width: number): string {
   return sanitizeText(value).slice(0, width).padEnd(width, " ");
 }
 
-export function wrapText(value: string, width = BOARD_COLS): string[] {
+export function wrapText(value: string, width: number): string[] {
+  if (width <= 0) {
+    return [];
+  }
+
   const words = sanitizeText(value).split(/\s+/).filter(Boolean);
   if (words.length === 0) {
     return [""];
@@ -56,7 +75,22 @@ export function wrapText(value: string, width = BOARD_COLS): string[] {
   const lines: string[] = [];
   let current = "";
 
+  const pushWordChunks = (word: string) => {
+    for (let start = 0; start < word.length; start += width) {
+      lines.push(word.slice(start, start + width));
+    }
+  };
+
   for (const word of words) {
+    if (word.length > width) {
+      if (current) {
+        lines.push(current);
+        current = "";
+      }
+      pushWordChunks(word);
+      continue;
+    }
+
     if (!current) {
       current = word;
       continue;
@@ -78,11 +112,12 @@ export function wrapText(value: string, width = BOARD_COLS): string[] {
   return lines;
 }
 
-export function linesToGrid(lines: string[]): BoardGrid {
-  const grid = createEmptyGrid();
+export function linesToGrid(lines: string[], board?: BoardDimensions): BoardGrid {
+  const dimensions = resolveBoardDimensions(board);
+  const grid = createEmptyGrid(dimensions);
 
-  lines.slice(0, BOARD_ROWS).forEach((line, row) => {
-    const normalized = sanitizeText(line).slice(0, BOARD_COLS);
+  lines.slice(0, dimensions.rows).forEach((line, row) => {
+    const normalized = sanitizeText(line).slice(0, dimensions.cols);
     for (let col = 0; col < normalized.length; col += 1) {
       grid[row][col] = normalized[col];
     }
@@ -91,18 +126,20 @@ export function linesToGrid(lines: string[]): BoardGrid {
   return grid;
 }
 
-export function centerLines(lines: string[]): BoardGrid {
-  const trimmed = lines.slice(0, BOARD_ROWS);
-  const topPadding = Math.max(0, Math.floor((BOARD_ROWS - trimmed.length) / 2));
-  const mapped = Array.from({ length: BOARD_ROWS }, (_, row) => {
+export function centerLines(lines: string[], board?: BoardDimensions): BoardGrid {
+  const dimensions = resolveBoardDimensions(board);
+  const trimmed = lines.slice(0, dimensions.rows);
+  const topPadding = Math.max(0, Math.floor((dimensions.rows - trimmed.length) / 2));
+  const mapped = Array.from({ length: dimensions.rows }, (_, row) => {
     const source = trimmed[row - topPadding] ?? "";
-    return padCenter(source, BOARD_COLS);
+    return padCenter(source, dimensions.cols);
   });
-  return linesToGrid(mapped);
+  return linesToGrid(mapped, dimensions);
 }
 
-export function centerText(value: string): BoardGrid {
-  return centerLines(wrapText(value, BOARD_COLS));
+export function centerText(value: string, board?: BoardDimensions): BoardGrid {
+  const dimensions = resolveBoardDimensions(board);
+  return centerLines(wrapText(value, dimensions.cols), dimensions);
 }
 
 export function renderRegion(
@@ -113,11 +150,12 @@ export function renderRegion(
   lines: string[],
   align: "left" | "center" = "left",
 ): BoardGrid {
+  const { rows } = getGridDimensions(grid);
   let next = grid;
 
   lines.forEach((line, index) => {
     const targetRow = rowStart + index;
-    if (targetRow < 0 || targetRow >= BOARD_ROWS) {
+    if (targetRow < 0 || targetRow >= rows) {
       return;
     }
     const padded = align === "center" ? padCenter(line, width) : padRight(line, width);

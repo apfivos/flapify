@@ -4,10 +4,13 @@ export type SceneId =
   | "custom"
   | "clockDate"
   | "weather"
-  | "marketsDashboard";
+  | "marketsDashboard"
+  | "countdown"
+  | "news";
 export type SceneKind = "full" | "dashboard";
 export type TimezoneMode = "device" | "location";
 export type ThemeId = "classic" | "amber" | "terminal" | "warmWhite";
+export type BoardSizeId = "standard" | "large" | "dense";
 
 export interface ScenePlaylistItem {
   id: SceneId;
@@ -31,6 +34,17 @@ export interface DimmingSettings {
   end: string;
 }
 
+export interface CountdownItem {
+  id: string;
+  label: string;
+  targetDate: string;
+}
+
+export interface BoardDimensions {
+  rows: number;
+  cols: number;
+}
+
 export interface PersistedSettings {
   playlist: ScenePlaylistItem[];
   locationQuery: string;
@@ -42,6 +56,9 @@ export interface PersistedSettings {
   customMessages: string[];
   quoteRotation: string[];
   cryptoWatchlist: string[];
+  countdowns: CountdownItem[];
+  newsFeeds: string[];
+  boardSize: BoardSizeId;
   kioskMode: boolean;
   restoreLastState: boolean;
   onboardingCompleted: boolean;
@@ -68,6 +85,19 @@ export interface CryptoQuote {
   updatedAt?: string;
 }
 
+export interface NewsHeadline {
+  title: string;
+  source: string;
+  publishedAt: string;
+}
+
+export interface QuotePack {
+  id: string;
+  label: string;
+  description: string;
+  quotes: string[];
+}
+
 export interface FeedSnapshot<T> {
   status: "idle" | "loading" | "ready" | "error" | "unconfigured";
   data: T;
@@ -77,7 +107,7 @@ export interface FeedSnapshot<T> {
 }
 
 export interface FeedAdapter<TData, TRaw = unknown> {
-  id: "weather" | "crypto";
+  id: "weather" | "crypto" | "news";
   pollIntervalMs: number;
   staleAfterMs: number;
   isConfigured: (settings: PersistedSettings) => boolean;
@@ -90,12 +120,14 @@ export interface FeedAdapter<TData, TRaw = unknown> {
 export interface AppFeeds {
   weather: FeedSnapshot<WeatherData | null>;
   crypto: FeedSnapshot<CryptoQuote[]>;
+  news: FeedSnapshot<NewsHeadline[]>;
 }
 
 export interface SceneContext {
   now: Date;
   settings: PersistedSettings;
   feeds: AppFeeds;
+  board: BoardDimensions;
   quoteIndex: number;
   customIndex: number;
 }

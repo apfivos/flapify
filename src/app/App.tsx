@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { SCENE_LABELS, SPLASH_MIN_DURATION_MS, UI_IDLE_TIMEOUT_MS } from "../constants";
+import {
+  BOARD_SIZE_PRESETS,
+  SCENE_LABELS,
+  SPLASH_MIN_DURATION_MS,
+  UI_IDLE_TIMEOUT_MS,
+} from "../constants";
 import { mechanicalAudioEngine } from "../audio/MechanicalAudioEngine";
 import { ControlDrawer } from "../components/ControlDrawer";
 import { DisplayErrorBoundary } from "../components/ErrorBoundaries";
@@ -18,9 +23,14 @@ import {
   getPreviousSceneId,
   getRenderablePlaylist,
 } from "../lib/playlist";
-import { marketTickerSummary, weatherTickerSummary } from "../lib/scenes";
-import { loadRuntime, loadSettings, saveRuntime, saveSettings } from "../state/settings";
-import type { PersistedSettings, SceneId } from "../types";
+import { getActiveCountdowns, marketTickerSummary, weatherTickerSummary } from "../lib/scenes";
+import {
+  loadRuntime,
+  loadSettings,
+  saveRuntime,
+  saveSettings,
+} from "../state/settings";
+import type { BoardDimensions, PersistedSettings, SceneId } from "../types";
 
 interface ViewportState {
   width: number;
@@ -101,26 +111,31 @@ function sameViewportState(left: ViewportState, right: ViewportState): boolean {
   );
 }
 
-function resolveBoardWidth(viewport: ViewportState): number {
+function resolveBoardAspectRatio(board: BoardDimensions): number {
+  return (board.cols * 0.72) / board.rows;
+}
+
+function resolveBoardWidth(viewport: ViewportState, board: BoardDimensions): number {
   const { width, height, isMobilePortrait, isShortLandscape } = viewport;
+  const aspectRatio = resolveBoardAspectRatio(board);
 
   if (isMobilePortrait) {
-    return Math.max(300, Math.min(width - 8, (height - 236) * 2.72, 560));
+    return Math.max(300, Math.min(width - 8, (height - 236) * aspectRatio, 560));
   }
 
   if (isShortLandscape) {
-    return Math.max(360, Math.min(width - 20, (height - 176) * 2.5));
+    return Math.max(360, Math.min(width - 20, (height - 176) * aspectRatio));
   }
 
   if (width <= 820) {
-    return Math.max(320, Math.min(width - 20, (height - 250) * 2.5));
+    return Math.max(320, Math.min(width - 20, (height - 250) * aspectRatio));
   }
 
   if (width <= 1100) {
-    return Math.max(420, Math.min(width - 28, (height - 230) * 2.64));
+    return Math.max(420, Math.min(width - 28, (height - 230) * aspectRatio));
   }
 
-  return Math.max(520, Math.min(width - 48, (height - 180) * 2.64));
+  return Math.max(520, Math.min(width - 48, (height - 180) * aspectRatio));
 }
 
 export default function App() {
@@ -147,16 +162,31 @@ export default function App() {
   const { feeds, refreshAll } = useFeeds(settings);
   const wakeLock = useWakeLock();
 
-  const renderablePlaylist = useMemo(() => getRenderablePlaylist(settings), [settings]);
+  const boardDimensions = useMemo(() => BOARD_SIZE_PRESETS[settings.boardSize], [settings.boardSize]);
+  const boardAspectRatio = useMemo(() => resolveBoardAspectRatio(boardDimensions), [boardDimensions]);
+  const hasActiveCountdowns = useMemo(
+    () => getActiveCountdowns(settings, now).length > 0,
+    [now, settings],
+  );
+  const renderablePlaylist = useMemo(
+    () =>
+      getRenderablePlaylist(settings).filter(
+        (item) => item.id !== "countdown" || hasActiveCountdowns,
+      ),
+    [hasActiveCountdowns, settings],
+  );
   const effectiveKiosk = settings.kioskMode || standalone;
   const minuteBucket = Math.floor(now.getTime() / 60000);
   const dimLevel = useMemo(() => resolveActiveDimLevel(settings, now), [now, settings]);
-  const boardViewportKey = viewportState.isMobilePortrait
+  const boardViewportKey = `${settings.boardSize}-${viewportState.isMobilePortrait
     ? "mobile-portrait"
     : viewportState.isShortLandscape
       ? "short-landscape"
-      : "default";
-  const boardWidth = useMemo(() => resolveBoardWidth(viewportState), [viewportState]);
+      : "default"}`;
+  const boardWidth = useMemo(
+    () => resolveBoardWidth(viewportState, boardDimensions),
+    [boardDimensions, viewportState],
+  );
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNow(new Date()), 1000);
@@ -234,7 +264,9 @@ export default function App() {
   });
 
   useEffect(() => {
-    const nextTitle = activeSceneId ? `Flapify - ${SCENE_LABELS[activeSceneId]}` : "Flapify";
+    const nextTitle = activeSceneId
+      ? `Flapify - ${SCENE_LABELS[activeSceneId]}`
+      : "Flapify";
     document.title = nextTitle;
   }, [activeSceneId]);
 
@@ -300,7 +332,7 @@ export default function App() {
       setSceneTransitionActive(true);
       timeoutId = window.setTimeout(() => {
         setSceneTransitionActive(false);
-      }, 420);
+      }, 200);
       if (activeSceneId === "quote") {
         setQuoteIndex((value) => value + 1);
       }
@@ -384,9 +416,15 @@ export default function App() {
   };
 
   useKeyboardShortcuts({
-    onToggleRotation: () => setRotationPaused((value) => !value),
-    onNextScene: () => handleSceneSelection(getNextSceneId(renderablePlaylist, activeSceneId)),
-    onPreviousScene: () => handleSceneSelection(getPreviousSceneId(renderablePlaylist, activeSceneId)),
+    onToggleRotation: () => {
+      setRotationPaused((value) => !value);
+    },
+    onNextScene: () => {
+      handleSceneSelection(getNextSceneId(renderablePlaylist, activeSceneId));
+    },
+    onPreviousScene: () => {
+      handleSceneSelection(getPreviousSceneId(renderablePlaylist, activeSceneId));
+    },
     onDismissUi: () => {
       if (onboardingVisible) {
         setOnboardingVisible(false);
@@ -439,6 +477,7 @@ export default function App() {
     <div
       className={`ff-app ${effectiveKiosk ? "ff-app--kiosk" : ""}`}
       data-theme={settings.theme}
+      data-board-size={settings.boardSize}
       data-mobile-portrait={viewportState.isMobilePortrait ? "true" : "false"}
       data-short-landscape={viewportState.isShortLandscape ? "true" : "false"}
     >
@@ -466,6 +505,7 @@ export default function App() {
             style={{
               width: `${Math.round(boardWidth)}px`,
               maxWidth: "100%",
+              aspectRatio: `${boardAspectRatio}`,
               transform: `translate(${boardShift.x}px, ${boardShift.y}px)`,
             }}
           >

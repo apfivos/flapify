@@ -1,7 +1,18 @@
-import type { PersistedSettings, SceneDefinition, SceneId, ScenePlaylistItem, ThemeId } from "./types";
+import type {
+  BoardDimensions,
+  BoardSizeId,
+  PersistedSettings,
+  SceneDefinition,
+  SceneId,
+  ScenePlaylistItem,
+  ThemeId,
+} from "./types";
 
-export const BOARD_ROWS = 6;
-export const BOARD_COLS = 22;
+export const BOARD_SIZE_PRESETS: Record<BoardSizeId, BoardDimensions> = {
+  standard: { rows: 6, cols: 22 },
+  large: { rows: 4, cols: 16 },
+  dense: { rows: 8, cols: 28 },
+};
 export const FLAP_CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,:;!?/-+@#$%&() ";
 export const FLIP_DURATION_MS = 152;
 export const FLIP_STAGGER_MS = 26;
@@ -12,7 +23,7 @@ export const UI_IDLE_TIMEOUT_MS = 4000;
 export const SPLASH_MIN_DURATION_MS = 900;
 export const QUIET_HOURS_DEFAULT_START = "22:00";
 export const QUIET_HOURS_DEFAULT_END = "07:00";
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = "0.1.1";
 
 export const DEFAULT_QUOTES = [
   "THE BEST TIME TO START IS NOW",
@@ -34,7 +45,14 @@ export const DEFAULT_PLAYLIST: ScenePlaylistItem[] = [
   { id: "clockDate", enabled: true, durationSec: 10 },
   { id: "weather", enabled: true, durationSec: 12 },
   { id: "marketsDashboard", enabled: true, durationSec: 15 },
+  { id: "countdown", enabled: false, durationSec: 12 },
+  { id: "news", enabled: false, durationSec: 12 },
   { id: "custom", enabled: false, durationSec: 12 },
+];
+
+export const DEFAULT_NEWS_FEEDS = [
+  "http://feeds.bbci.co.uk/news/world/rss.xml",
+  "https://feeds.reuters.com/reuters/topNews",
 ];
 
 export const THEME_LABELS: Record<ThemeId, string> = {
@@ -61,6 +79,9 @@ export const DEFAULT_SETTINGS: PersistedSettings = {
   customMessages: [],
   quoteRotation: DEFAULT_QUOTES,
   cryptoWatchlist: ["bitcoin", "ethereum", "solana"],
+  countdowns: [],
+  newsFeeds: DEFAULT_NEWS_FEEDS,
+  boardSize: "standard",
   kioskMode: false,
   restoreLastState: true,
   onboardingCompleted: false,
@@ -79,6 +100,8 @@ export const SCENE_LABELS: Record<SceneId, string> = {
   clockDate: "Clock",
   weather: "Weather",
   marketsDashboard: "Crypto",
+  countdown: "Countdown",
+  news: "News",
 };
 
 export const SCENE_ORDER: SceneId[] = [
@@ -86,6 +109,8 @@ export const SCENE_ORDER: SceneId[] = [
   "clockDate",
   "weather",
   "marketsDashboard",
+  "countdown",
+  "news",
   "custom",
 ];
 
@@ -131,5 +156,19 @@ export const SCENE_DEFINITIONS: SceneDefinition[] = [
     kind: "dashboard",
     defaultDurationSec: 15,
     requiresFeeds: ["crypto", "weather"],
+  },
+  {
+    id: "countdown",
+    label: SCENE_LABELS.countdown,
+    kind: "full",
+    defaultDurationSec: 12,
+    requiresFeeds: [],
+  },
+  {
+    id: "news",
+    label: SCENE_LABELS.news,
+    kind: "full",
+    defaultDurationSec: 12,
+    requiresFeeds: ["news"],
   },
 ];
