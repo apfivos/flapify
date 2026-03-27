@@ -35,6 +35,19 @@ interface ControlDrawerProps {
 
 type Tone = "neutral" | "live" | "stale" | "setup" | "waiting" | "error";
 
+function isFocusEngagingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (target.isContentEditable) {
+    return true;
+  }
+
+  const tagName = target.tagName;
+  return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
+}
+
 function feedTone(feed: AppFeeds[keyof AppFeeds]): Tone {
   if (feed.stale) {
     return "stale";
@@ -169,8 +182,12 @@ export function ControlDrawer({
         className={`ff-drawer ${visible ? "is-visible" : ""}`}
         onMouseEnter={() => onEngagementChange(true)}
         onMouseLeave={() => onEngagementChange(false)}
-        onFocusCapture={() => onEngagementChange(true)}
-        onBlurCapture={() => onEngagementChange(false)}
+        onFocusCapture={(event) => onEngagementChange(isFocusEngagingTarget(event.target))}
+        onBlurCapture={() => {
+          window.requestAnimationFrame(() => {
+            onEngagementChange(isFocusEngagingTarget(document.activeElement));
+          });
+        }}
       >
         <div className="ff-drawer__shell">
           <div className={`ff-drawer__main ${advancedOpen ? "is-hidden" : ""}`}>

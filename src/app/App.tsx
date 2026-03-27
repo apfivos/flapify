@@ -22,6 +22,13 @@ import { marketTickerSummary, weatherTickerSummary } from "../lib/scenes";
 import { loadRuntime, loadSettings, saveRuntime, saveSettings } from "../state/settings";
 import type { PersistedSettings, SceneId } from "../types";
 
+interface ViewportState {
+  width: number;
+  height: number;
+  isMobilePortrait: boolean;
+  isShortLandscape: boolean;
+}
+
 function resolveInitialSettings(): PersistedSettings {
   const base = loadSettings();
   const search = new URLSearchParams(window.location.search);
@@ -56,6 +63,66 @@ function resolveDisplayStandalone(): boolean {
   return window.matchMedia("(display-mode: standalone)").matches;
 }
 
+function readViewportState(): ViewportState {
+  const width = Math.round(
+    window.visualViewport?.width
+    ?? document.documentElement.clientWidth
+    ?? window.innerWidth,
+  );
+  const height = Math.round(
+    window.visualViewport?.height
+    ?? document.documentElement.clientHeight
+    ?? window.innerHeight,
+  );
+  const orientationType = window.screen.orientation?.type;
+  const isPortrait =
+    typeof orientationType === "string"
+      ? orientationType.startsWith("portrait")
+      : height > width;
+  const isLandscape =
+    typeof orientationType === "string"
+      ? orientationType.startsWith("landscape")
+      : width > height;
+
+  return {
+    width,
+    height,
+    isMobilePortrait: isPortrait && width <= 900,
+    isShortLandscape: isLandscape && height <= 520,
+  };
+}
+
+function sameViewportState(left: ViewportState, right: ViewportState): boolean {
+  return (
+    left.width === right.width
+    && left.height === right.height
+    && left.isMobilePortrait === right.isMobilePortrait
+    && left.isShortLandscape === right.isShortLandscape
+  );
+}
+
+function resolveBoardWidth(viewport: ViewportState): number {
+  const { width, height, isMobilePortrait, isShortLandscape } = viewport;
+
+  if (isMobilePortrait) {
+    return Math.max(300, Math.min(width - 8, (height - 236) * 2.72, 560));
+  }
+
+  if (isShortLandscape) {
+    return Math.max(360, Math.min(width - 20, (height - 176) * 2.5));
+  }
+
+  if (width <= 820) {
+    return Math.max(320, Math.min(width - 20, (height - 250) * 2.5));
+  }
+
+  if (width <= 1100) {
+    return Math.max(420, Math.min(width - 28, (height - 230) * 2.64));
+  }
+
+  return Math.max(520, Math.min(width - 48, (height - 180) * 2.64));
+}
+
 export default function App() {
   const [settings, setSettings] = useState<PersistedSettings>(() => resolveInitialSettings());
   const [activeSceneId, setActiveSceneId] = useState<SceneId | null>(() =>
@@ -74,6 +141,7 @@ export default function App() {
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
   const [sceneTransitionActive, setSceneTransitionActive] = useState(false);
   const [boardBusy, setBoardBusy] = useState(false);
+  const [viewportState, setViewportState] = useState<ViewportState>(() => readViewportState());
   const previousSceneRef = useRef<SceneId | null>(null);
   const hideTimerRef = useRef<number | null>(null);
   const { feeds, refreshAll } = useFeeds(settings);
@@ -83,10 +151,67 @@ export default function App() {
   const effectiveKiosk = settings.kioskMode || standalone;
   const minuteBucket = Math.floor(now.getTime() / 60000);
   const dimLevel = useMemo(() => resolveActiveDimLevel(settings, now), [now, settings]);
+  const boardViewportKey = viewportState.isMobilePortrait
+    ? "mobile-portrait"
+    : viewportState.isShortLandscape
+      ? "short-landscape"
+      : "default";
+  const boardWidth = useMemo(() => resolveBoardWidth(viewportState), [viewportState]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNow(new Date()), 1000);
     return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const frameIds: number[] = [];
+    const timeoutIds: number[] = [];
+    const portraitMedia = window.matchMedia?.("(orientation: portrait)");
+    const landscapeMedia = window.matchMedia?.("(orientation: landscape)");
+    const visualViewport = window.visualViewport;
+    const screenOrientation = window.screen.orientation;
+
+    const syncViewport = () => {
+      setViewportState((current) => {
+        const next = readViewportState();
+        return sameViewportState(current, next) ? current : next;
+      });
+    };
+
+    const scheduleSyncBurst = () => {
+      frameIds.push(window.requestAnimationFrame(syncViewport));
+      [0, 90, 220, 420, 900].forEach((delay) => {
+        timeoutIds.push(window.setTimeout(syncViewport, delay));
+      });
+    };
+
+    const syncIntervalId = window.setInterval(syncViewport, 1000);
+
+    window.addEventListener("resize", scheduleSyncBurst);
+    window.addEventListener("orientationchange", scheduleSyncBurst);
+    window.addEventListener("focus", scheduleSyncBurst);
+    window.addEventListener("pageshow", scheduleSyncBurst);
+    document.addEventListener("visibilitychange", scheduleSyncBurst);
+    visualViewport?.addEventListener("resize", scheduleSyncBurst);
+    portraitMedia?.addEventListener("change", scheduleSyncBurst);
+    landscapeMedia?.addEventListener("change", scheduleSyncBurst);
+    screenOrientation?.addEventListener?.("change", scheduleSyncBurst);
+    scheduleSyncBurst();
+
+    return () => {
+      frameIds.forEach((id) => window.cancelAnimationFrame(id));
+      timeoutIds.forEach((id) => window.clearTimeout(id));
+      window.clearInterval(syncIntervalId);
+      window.removeEventListener("resize", scheduleSyncBurst);
+      window.removeEventListener("orientationchange", scheduleSyncBurst);
+      window.removeEventListener("focus", scheduleSyncBurst);
+      window.removeEventListener("pageshow", scheduleSyncBurst);
+      document.removeEventListener("visibilitychange", scheduleSyncBurst);
+      visualViewport?.removeEventListener("resize", scheduleSyncBurst);
+      portraitMedia?.removeEventListener("change", scheduleSyncBurst);
+      landscapeMedia?.removeEventListener("change", scheduleSyncBurst);
+      screenOrientation?.removeEventListener?.("change", scheduleSyncBurst);
+    };
   }, []);
 
   useEffect(() => {
@@ -314,6 +439,8 @@ export default function App() {
     <div
       className={`ff-app ${effectiveKiosk ? "ff-app--kiosk" : ""}`}
       data-theme={settings.theme}
+      data-mobile-portrait={viewportState.isMobilePortrait ? "true" : "false"}
+      data-short-landscape={viewportState.isShortLandscape ? "true" : "false"}
     >
       <div className="ff-ambient" />
       <div className="ff-dim-layer" style={{ opacity: dimLevel }} />
@@ -336,9 +463,14 @@ export default function App() {
         <DisplayErrorBoundary onOpenSettings={openSettings}>
           <div
             className={`ff-stage__board ${sceneTransitionActive ? "is-switching" : ""}`}
-            style={{ transform: `translate(${boardShift.x}px, ${boardShift.y}px)` }}
+            style={{
+              width: `${Math.round(boardWidth)}px`,
+              maxWidth: "100%",
+              transform: `translate(${boardShift.x}px, ${boardShift.y}px)`,
+            }}
           >
             <SceneBoard
+              key={boardViewportKey}
               activeSceneId={activeSceneId}
               now={now}
               settings={settings}
